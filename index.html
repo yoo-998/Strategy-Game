@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>코인 기부 전략 게임</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@900&family=Pretendard:wght@400;700;900&display=swap');
+        
+        body { 
+            font-family: 'Pretendard', sans-serif; 
+            background-color: #05070A;
+            background-image: radial-gradient(circle at 50% -20%, #1a2332 0%, #05070a 100%);
+            color: #E2E8F0; 
+            -webkit-tap-highlight-color: transparent; 
+            overflow-x: hidden;
+            min-height: 100vh;
+        }
+
+        .glass-card {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .num-display { font-family: 'Montserrat', sans-serif; font-variant-numeric: tabular-nums; }
+
+        .fade-in { animation: fadeIn 0.4s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
+
+        .btn-active:active { transform: scale(0.96); transition: 0.1s; }
+        
+        .dividend-glow {
+            text-shadow: 0 0 25px rgba(59, 130, 246, 0.5);
+            color: #FFFFFF;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState } = React;
+
+        const App = () => {
+            const [step, setStep] = useState('setup');
+            const [numTeams, setNumTeams] = useState(4);
+            const [totalRounds, setTotalRounds] = useState(5);
+            const [currentRound, setCurrentRound] = useState(1);
+            const [activeTeam, setActiveTeam] = useState(null);
+            const [gameData, setGameData] = useState([]);
+            const [roundDonations, setRoundDonations] = useState({});
+            const [isLocked, setIsLocked] = useState(false);
+            const [showDetails, setShowDetails] = useState(false);
+
+            const start = () => setStep('main');
+            const openInput = (idx) => { setActiveTeam(idx); setIsLocked(false); setStep('input'); };
+            const submitDonation = (val) => { setRoundDonations(prev => ({ ...prev, [activeTeam]: val })); setIsLocked(true); };
+
+            const finishRound = () => {
+                const donations = Array.from({ length: numTeams }, (_, i) => roundDonations[i] || 0);
+                const total = donations.reduce((a, b) => a + b, 0);
+                const div = Number(((total * 2) / numTeams).toFixed(1));
+                setGameData([...gameData, { round: currentRound, donations, total, dividend: div }]);
+                setStep('roundResult');
+            };
+
+            const next = () => {
+                if (currentRound < totalRounds) {
+                    setCurrentRound(prev => prev + 1);
+                    setRoundDonations({});
+                    setStep('main');
+                } else {
+                    setStep('finalResult');
+                }
+            };
+
+            const calculateFinal = () => {
+                const totals = Array(numTeams).fill(0);
+                gameData.forEach(r => {
+                    r.donations.forEach((d, i) => totals[i] += (10 - d) + r.dividend);
+                });
+                return totals.map(t => Number(t.toFixed(1)));
+            };
+
+            return (
+                <div className="min-h-screen p-6 max-w-md mx-auto flex flex-col">
+                    <header className="mb-10 text-center fade-in">
+                        <p className="text-[10px] font-black tracking-[0.5em] text-blue-500 uppercase mb-1">Cipher Strategy</p>
+                        <h1 className="text-2xl font-black tracking-tighter text-white">코인 기부 전략 게임</h1>
+                    </header>
+
+                    {/* 1단계: 설정 */}
+                    {step === 'setup' && (
+                        <div className="fade-in space-y-10 py-10">
+                            <section className="space-y-4 text-center">
+                                <h2 className="font-bold text-gray-400 text-sm">참가 팀 수</h2>
+                                <div className="grid grid-cols-3 gap-3">
+                                    {[4, 5, 6].map(n => (
+                                        <button key={n} onClick={() => setNumTeams(n)}
+                                            className={`h-16 rounded-2xl glass-card text-2xl font-black btn-active ${numTeams === n ? 'border-blue-500 bg-blue-500/20 text-white' : 'text-white/20 border-white/5'}`}>
+                                            {n}
+                                        </button>
+                                    ))}
+                                </div>
+                            </section>
+                            <section className="space-y-4 text-center">
+                                <h2 className="font-bold text-gray-400 text-sm">총 라운드</h2>
+                                <div className="grid grid-cols-3 gap-3">
+                                    {[5, 6, 7, 8, 9, 10].map(r => (
+                                        <button key={r} onClick={() => setTotalRounds(r)}
+                                            className={`h-14 rounded-xl glass-card font-bold btn-active ${totalRounds === r ? 'border-blue-500 bg-blue-500/20 text-white' : 'text-white/20 border-white/5'}`}>
+                                            {r}R
+                                        </button>
+                                    ))}
+                                </div>
+                            </section>
+                            <button onClick={start} className="w-full py-5 bg-blue-600 text-white rounded-2xl font-black text-lg btn-active shadow-xl shadow-blue-900/40">게임 시작</button>
+                        </div>
+                    )}
+
+                    {/* 2단계: 메인 보드 */}
+                    {step === 'main' && (
+                        <div className="fade-in space-y-6">
+                            <div className="glass-card p-6 rounded-[2rem] flex justify-between items-center border-l-4 border-blue-500">
+                                <div>
+                                    <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">현재 상태</p>
+                                    <h2 className="text-3xl font-black num-display italic tracking-tight">{currentRound} <span className="text-sm opacity-30">/ {totalRounds}</span></h2>
+                                </div>
+                                <div className="text-right">
+                                    <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">보유 코인</p>
+                                    <p className="text-blue-400 font-black">10개</p>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4 pt-2">
+                                {Array.from({ length: numTeams }).map((_, i) => (
+                                    <button key={i} disabled={roundDonations[i] !== undefined} onClick={() => openInput(i)}
+                                        className={`h-32 rounded-[2rem] glass-card flex flex-col items-center justify-center gap-2 btn-active
+                                        ${roundDonations[i] !== undefined ? 'opacity-10' : 'border-white/5 active:border-blue-500'}`}>
+                                        <span className="text-[10px] font-bold text-white/30 uppercase tracking-widest">TEAM</span>
+                                        <span className="text-4xl font-black num-display">{i + 1}</span>
+                                        {roundDonations[i] !== undefined && <span className="text-[10px] text-blue-400 font-bold tracking-tight">입력 완료</span>}
+                                    </button>
+                                ))}
+                            </div>
+
+                            <button disabled={Object.keys(roundDonations).length < numTeams} onClick={finishRound}
+                                className={`w-full py-5 rounded-2xl font-black text-lg transition-all ${Object.keys(roundDonations).length === numTeams ? 'bg-white text-black shadow-white/10' : 'bg-white/5 text-white/20 cursor-not-allowed'}`}>
+                                라운드 결과 확인
+                            </button>
+                        </div>
+                    )}
+
+                    {/* 3단계: 입력 화면 */}
+                    {step === 'input' && (
+                        <div className="fade-in flex-1 flex flex-col justify-center space-y-12">
+                            {!isLocked ? (
+                                <div className="space-y-10">
+                                    <div className="text-center space-y-2">
+                                        <h2 className="text-5xl font-black italic tracking-tighter text-blue-500 num-display">TEAM {activeTeam + 1}</h2>
+                                        <p className="text-gray-500 font-bold text-xs uppercase tracking-widest pt-2">기부액을 선택하세요</p>
+                                    </div>
+                                    <div className="grid gap-4">
+                                        {[0, 5, 10].map(v => (
+                                            <button key={v} onClick={() => submitDonation(v)}
+                                                className="py-10 glass-card rounded-[2.5rem] text-4xl font-black num-display btn-active border-white/5 active:bg-blue-600 active:text-white transition-all">
+                                                {v}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="glass-card p-10 rounded-[3rem] text-center space-y-8 fade-in">
+                                    <div className="text-5xl">🔒</div>
+                                    <h3 className="text-xl font-black tracking-tight">입력 완료</h3>
+                                    <p className="text-gray-500 text-sm font-medium leading-relaxed">데이터가 안전하게 가려졌습니다.<br/>다음 플레이어에게 기기를 넘기세요.</p>
+                                    <button onClick={() => setStep('main')} className="w-full py-5 bg-blue-600 text-white rounded-2xl font-black btn-active shadow-lg shadow-blue-900/20">메인으로 돌아가기</button>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* 4단계: 라운드 결과 */}
+                    {step === 'roundResult' && (
+                        <div className="fade-in text-center space-y-8 my-auto">
+                            <div className="py-16 glass-card rounded-[4rem] relative overflow-hidden border-blue-500/20 shadow-2xl">
+                                {/* ★ 개별 배당금 문구 ★ */}
+                                <p className="text-blue-500 font-black tracking-widest text-sm uppercase mb-4 underline underline-offset-4 decoration-blue-500/30">개별 배당금</p>
+                                <div className="text-[10rem] font-black leading-none num-display italic tracking-tighter dividend-glow mb-8">
+                                    {gameData[gameData.length-1].dividend}
+                                </div>
+                                
+                                <div className="mt-4 px-6 py-8 bg-white/5 rounded-[3rem] mx-6 border border-white/10">
+                                    {/* ★ 총 기부금 합계 문구 - 위와 동일하게 크기 조절 ★ */}
+                                    <p className="text-gray-400 font-black tracking-widest text-sm uppercase mb-4 opacity-80 underline underline-offset-4 decoration-white/10">총 기부금 합계</p>
+                                    <p className="text-5xl font-black text-white num-display italic underline decoration-blue-500 decoration-4 underline-offset-8">{gameData[gameData.length-1].total}</p>
+                                </div>
+                            </div>
+                            <button onClick={next} className="w-full py-6 bg-white text-black rounded-[2rem] font-black text-lg btn-active shadow-xl">
+                                {currentRound === totalRounds ? '최종 순위 발표' : '다음 라운드 시작'}
+                            </button>
+                        </div>
+                    )}
+
+                    {/* 5단계: 최종 결과 */}
+                    {step === 'finalResult' && (
+                        <div className="fade-in space-y-6 py-4">
+                            <div className="text-center mb-10">
+                                <h2 className="text-3xl font-black italic tracking-tighter text-blue-500">최종 스코어 보드</h2>
+                                <p className="text-gray-500 text-[10px] font-bold uppercase tracking-[0.4em] mt-3">Mission Complete</p>
+                            </div>
+                            
+                            <div className="space-y-3">
+                                {calculateFinal().map((score, i) => (
+                                    <div key={i} className="glass-card p-6 rounded-2xl flex justify-between items-center border border-white/5">
+                                        <span className="font-bold text-gray-500 text-xs uppercase tracking-tighter">{i + 1}팀 최종 자산</span>
+                                        <span className="text-3xl num-display font-black text-white">{score}</span>
+                                    </div>
+                                ))}
+                            </div>
+
+                            <div className="pt-12 mt-12 border-t border-white/10">
+                                {!showDetails ? (
+                                    <button onClick={() => setShowDetails(true)} 
+                                        className="w-full py-4 glass-card border-white/10 text-gray-500 rounded-2xl font-bold text-xs btn-active tracking-widest uppercase">
+                                        상세 기록 보기 ▼
+                                    </button>
+                                ) : (
+                                    <div className="fade-in space-y-5">
+                                        <div className="glass-card rounded-[2rem] overflow-hidden border border-white/10 shadow-2xl">
+                                            <table className="w-full text-center border-collapse">
+                                                <thead>
+                                                    <tr className="bg-white/5 text-[10px] font-bold uppercase text-gray-500">
+                                                        <th className="p-4 border-b border-white/5">팀</th>
+                                                        {gameData.map(r => <th key={r.round} className="p-4 border-b border-white/5">{r.round}R</th>)}
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="num-display font-bold text-xs">
+                                                    {Array.from({ length: numTeams }).map((_, tIdx) => (
+                                                        <tr key={tIdx} className="border-b border-white/5 last:border-0 hover:bg-white/5 transition-colors">
+                                                            <td className="p-5 text-blue-500 font-black">T{tIdx + 1}</td>
+                                                            {gameData.map((r, ri) => (
+                                                                <td key={ri} className={`p-5 ${r.donations[tIdx] === 0 ? 'text-red-500 font-black' : 'text-gray-400'}`}>
+                                                                    {r.donations[tIdx]}
+                                                                </td>
+                                                            ))}
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                        <button onClick={() => window.location.reload()} className="w-full py-4 text-white/10 text-[9px] font-bold tracking-[0.5em] uppercase hover:text-white/40">↻ 게임 초기화</button>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
