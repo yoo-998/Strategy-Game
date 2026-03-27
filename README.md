@@ -1,1 +1,1 @@
-# Coin-Donation-Strategy-Game
+# Strategy-Game
